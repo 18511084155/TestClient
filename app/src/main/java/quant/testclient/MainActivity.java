@@ -197,8 +197,12 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
     public void sendMessage(int what,Object obj) {
         if(null!=messenger){
             Message msg = Message.obtain(null, what,obj);
-            // 设置回调用的Messenger
+            //设置回调用的Messenger
             msg.replyTo = reply;
+            //为所有消息放入设备 id
+            Bundle data=new Bundle();
+            data.putString("id",DeviceUtils.getDeviceId(getApplicationContext()));
+            msg.setData(data);
             try {
                 messenger.send(msg);
             } catch (RemoteException e) {

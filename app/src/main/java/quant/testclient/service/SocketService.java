@@ -2,6 +2,7 @@ package quant.testclient.service;
 
 import android.app.Service;
 import android.content.Intent;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
@@ -53,7 +54,10 @@ public class SocketService extends Service {
                 //连接 socket,连接完自动尝试连接 adb,一旦连接成功,此线程会被阻塞
                 if(null!=msg.obj&& StringUtils.validateAddress(msg.obj.toString())){
                     try {
-                        connectSocket(msg.obj.toString());
+                        Bundle data = msg.getData();
+                        String id=null;
+                        if(null!=data) id=data.getString("id");
+                        connectSocket(msg.obj.toString(),id);
                     } catch (RemoteException e) {
                         e.printStackTrace();
                     }
@@ -147,8 +151,9 @@ public class SocketService extends Service {
      * 连接socket
      *
      * @param address
+     * @param id 设备 id
      */
-    public void connectSocket(String address) throws RemoteException {
+    public void connectSocket(String address,String id) throws RemoteException {
         interrupt =true;
         BufferedReader br = null;
         while (interrupt) {
@@ -178,6 +183,8 @@ public class SocketService extends Service {
                     socket = new Socket(address, Constant.PORT);
                     socket.setKeepAlive(true);
                     printWriter = new PrintWriter(socket.getOutputStream());
+                    //向服务器写入设备
+                    printWriter.write(id);
                     sendMessage(MessageWhat.LOG,ResUtils.getString(R.string.connecting));
                     //重试后连接成功
                     if (0 < reconnectCount) {

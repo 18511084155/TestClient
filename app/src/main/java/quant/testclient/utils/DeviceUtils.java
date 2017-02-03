@@ -3,7 +3,14 @@ package quant.testclient.utils;
 import android.content.Context;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
+import android.provider.Settings;
+import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.net.Inet4Address;
@@ -11,6 +18,10 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.UUID;
+
+import quant.testclient.sharedprefs.Prefs;
+import quant.testclient.sharedprefs.Setting;
 
 /**
  * 获得设备唯一id
@@ -20,8 +31,6 @@ import java.util.Enumeration;
  */
 public class DeviceUtils {
     private final static String TAG = DeviceUtils.class.getSimpleName();
-
-
 
     public static void resetWifi(Context context) {
         WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
@@ -86,4 +95,96 @@ public class DeviceUtils {
         }
         return null;
     }
+
+    /**
+     * 获得一个设备 id
+     * 先取使用过的配置文件 id,若没有代表首次使用,则按以下顺序取
+     * 先取 imei 码,取不到取 AndroidId,再取不到取 一个随机生成的 uuid
+     * @param context
+     * @return
+     */
+    public static String getDeviceId(Context context) {
+        String id = Prefs.getString(Setting.ID);
+        if(TextUtils.isEmpty(id)){
+            id=getAndroidId(context);
+            if (TextUtils.isEmpty(id)) {
+                id = getAndroidImei(context);
+            }
+            if (TextUtils.isEmpty(id)) {
+                id=getUUid(context);
+            }
+            //记录使用 id
+            Prefs.putString(Setting.ID,id);
+        }
+        return id;
+    }
+
+    /**
+     * 获得android设备id
+     *
+     * @return
+     */
+    public static String getAndroidId(Context context) {
+        String id = null;
+        if (TextUtils.isEmpty(id)) {
+            try {
+                id = Settings.Secure.getString(context.getContentResolver(),
+                        Settings.Secure.ANDROID_ID);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return id;
+    }
+
+    /**
+     * 获得imei码
+     *
+     * @return
+     */
+    public static String getAndroidImei(Context context) {
+        String id = null;
+        try {
+            if(null!=context){
+                id = ((TelephonyManager) context
+                        .getSystemService(Context.TELEPHONY_SERVICE)).getDeviceId();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return id;
+    }
+
+    private static String sID = null;
+
+    public synchronized static String getUUid(Context context) {
+        if (sID == null) {
+            try {
+                File installation = new File(context.getFilesDir(), "INSTALLATION");
+                if (!installation.exists()){
+                    writeInstallationFile(installation);
+                }
+                sID = readInstallationFile(installation);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return sID;
+    }
+
+    private static String readInstallationFile(File installation) throws IOException {
+        RandomAccessFile f = new RandomAccessFile(installation, "r");
+        byte[] bytes = new byte[(int) f.length()];
+        f.readFully(bytes);
+        f.close();
+        return new String(bytes);
+    }
+
+    private static void writeInstallationFile(File installation) throws IOException {
+        FileOutputStream out = new FileOutputStream(installation);
+        String id = UUID.randomUUID().toString();
+        out.write(id.getBytes());
+        out.close();
+    }
+
 }
