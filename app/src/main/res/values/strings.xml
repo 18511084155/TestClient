@@ -30,7 +30,7 @@
     <string name="ok">确定</string>
     <string name="connect_complete">连接成功</string>
     <string name="connect_failed">连接失败</string>
-    <string name="connect_failed_value">连接失败:$1$s</string>
+    <string name="connect_failed_value">连接失败:%1$s</string>
     <string name="already_connect">服务器:%1$s 己连接!</string>
     <string name="connect_interrupt">连接中断</string>
     <string name="disconnect_complete">成功中断服务</string>

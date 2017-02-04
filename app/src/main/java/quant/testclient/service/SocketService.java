@@ -10,6 +10,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.support.annotation.Nullable;
 import android.text.TextUtils;
 import android.util.Log;
@@ -165,8 +166,12 @@ public class SocketService extends Service {
                         br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                     }
                     while ((line = br.readLine()) != null) {
-                        if (TextUtils.isEmpty(line)) continue;
-                        //处理数据
+                        if(socketIsConnect(socket)){
+                            if (TextUtils.isEmpty(line)) continue;
+                            //处理数据
+                        } else {
+                            connectSocket(address,id);
+                        }
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -192,22 +197,18 @@ public class SocketService extends Service {
                         reconnectCount = 0;
                     }
                     sendMessage(MessageWhat.CONNECT_COMPLETE);
-                    sendMessage(MessageWhat.LOG,ResUtils.getString(R.string.server_address_value,socket.getInetAddress().getHostAddress()));
+                    sendMessage(MessageWhat.LOG,ResUtils.getString(R.string.server_address_value,address));
 //                    //socket连接时,开启一个handler不断检测socket状态,此线程己被阻塞,因此可能存在假死
                     handler.removeCallbacks(examiner);
                     handler.postDelayed(examiner, 1000);
                 } catch (IOException e) {
                     e.printStackTrace();
                     sendMessage(MessageWhat.CONNECT_FAILED);
-                    sendMessage(MessageWhat.LOG,ResUtils.getString(R.string.connect_failed_value,socket.getInetAddress().getHostAddress()));
+                    sendMessage(MessageWhat.LOG,ResUtils.getString(R.string.connect_failed_value,address));
                 }
             }
             //延持
-            try {
-                Thread.sleep(1000);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            SystemClock.sleep(1000);
         }
     }
 
@@ -244,6 +245,8 @@ public class SocketService extends Service {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            handler.removeCallbacks(examiner);
         }
     }
 
