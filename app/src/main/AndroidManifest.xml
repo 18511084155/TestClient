@@ -28,6 +28,26 @@
         <activity android:name=".SettingActivity"/>
 
         <service android:name=".service.SocketService" android:persistent="true" />
+
+        <service android:name=".service.NotificationService"
+            android:process=":daemon"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="quant.testclient.NotificationService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".receive.StartServiceReceiver"
+            android:enabled="true"
+            android:permission="android.permission.RECEIVE_BOOT_COMPLETED" >
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.USER_PRESENT" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

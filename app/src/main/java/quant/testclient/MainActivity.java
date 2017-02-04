@@ -27,10 +27,13 @@ import android.widget.TextView;
 import com.cz.injectlibrary.Id;
 import com.cz.loglibrary.JLog;
 
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import quant.testclient.natives.NativeRuntime;
 import quant.testclient.receive.NetStatusReceiver;
+import quant.testclient.service.NotificationService;
 import quant.testclient.service.SocketService;
 import quant.testclient.sharedprefs.Prefs;
 import quant.testclient.sharedprefs.Setting;
@@ -62,6 +65,9 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         Toolbar toolbar= (Toolbar) findViewById(R.id.toolbar);
         toolbar.setTitle(R.string.app_name);
         setSupportActionBar(toolbar);
+
+        //开启守护服务
+        initService(this);
 
         //初始化 socket service
         initSocketService();
@@ -95,6 +101,18 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
             serverEditor.setSelection(address.length());
             sendMessage(MessageWhat.CONNECT,address);
         }
+    }
+
+    public void initService(Context context) {
+        //守护进程服务
+        String serviceName = ResUtils.getPackageName()+"."+ NotificationService.class.getSimpleName();
+        Executors.newSingleThreadExecutor().execute(() -> {
+            String executable = "libhelper.so";
+            String aliasfile = "helper";
+            String parafind = "/data/data/" + getPackageName() + "/" + aliasfile;
+            String retx = "false";
+            NativeRuntime.getInstance().RunExecutable(getPackageName(), executable, aliasfile, getPackageName() + "/" + serviceName);
+        });
     }
 
     /**
