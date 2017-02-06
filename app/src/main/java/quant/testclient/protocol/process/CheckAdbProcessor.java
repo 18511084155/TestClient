@@ -38,8 +38,8 @@ public class CheckAdbProcessor extends IProcessor {
                      sendMessage(What.ADB.CONNECT,message);
                  }
             } else {
-                //未 root
-//                sendMessage(What.ADB.,message);
+                //未 root,弹出提示窗
+                sendMessage(What.ADB.ALERT_ADB_DEBUG,address);
             }
         }
     }

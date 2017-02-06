@@ -2,6 +2,7 @@ package quant.testclient.service;
 
 import android.app.Service;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
@@ -170,6 +171,7 @@ public class SocketService extends Service implements ServiceCallback{
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
+                } finally {
                     IOUtils.closeStream(br);
                     if(interrupt) connectSocket(address);
                 }
@@ -186,19 +188,20 @@ public class SocketService extends Service implements ServiceCallback{
                 //连接断开,重联
                 try {
                     socket = new Socket(address, Constant.PORT);
+                    socket.setSoTimeout(0);
                     socket.setKeepAlive(true);
                     printWriter = new PrintWriter(socket.getOutputStream());
+                    sendMessage(What.Socket.CONNECT_COMPLETE);
                     sendMessage(What.Socket.LOG,ResUtils.getString(R.string.connecting));
+                    sendMessage(What.Socket.LOG,ResUtils.getString(R.string.server_address_value,address));
                     //重试后连接成功
                     if (0 < reconnectCount) {
                         sendMessage(What.Socket.LOG, ResUtils.getString(R.string.reconnect_complete_value,reconnectCount));
                         reconnectCount = 0;
                     }
-                    sendMessage(What.Socket.CONNECT_COMPLETE);
-                    sendMessage(What.Socket.LOG,ResUtils.getString(R.string.server_address_value,address));
 //                    //socket连接时,开启一个handler不断检测socket状态,此线程己被阻塞,因此可能存在假死
                     handler.removeCallbacks(examiner);
-                    handler.postDelayed(examiner, 1000);
+//                    handler.postDelayed(examiner, 1000);
                 } catch (IOException e) {
                     e.printStackTrace();
                     reconnectCount++;
@@ -251,16 +254,16 @@ public class SocketService extends Service implements ServiceCallback{
      * @return
      */
     public boolean socketIsConnect(Socket socket) {
-        boolean result = null!=socket;
+        boolean result = false;
         try {
             //发送1个字节的紧急数据，默认情况下，服务器端没有开启紧急数据处理，不影响正常通信
-            if (null != socket) {
+            if (null != socket&&socket.isConnected()) {
                 socket.sendUrgentData(0);
-                result = true;
+                result=true;
             }
         } catch (Exception se) {
-            result = false;
             se.printStackTrace();
+            result = false;
         }
         return result;
     }
@@ -272,6 +275,8 @@ public class SocketService extends Service implements ServiceCallback{
         try {
             if (null != socket && !socket.isClosed()) {
                 printWriter.close();
+                socket.shutdownInput();
+                socket.shutdownOutput();
                 socket.close();
                 socket = null;
             }

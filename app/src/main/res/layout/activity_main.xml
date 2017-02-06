@@ -185,9 +185,18 @@
             android:lines="1"
             android:ellipsize="end"
             android:background="@color/gray"
-            android:textSize="8sp"/>
+            android:textSize="12sp"/>
 
     </LinearLayout>
+
+    <android.support.design.widget.FloatingActionButton
+        android:id="@+id/iv_clear"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="right|bottom"
+        android:layout_marginBottom="32dp"
+        android:layout_marginRight="12dp"
+        android:src="@mipmap/ic_rotate_left_white_36dp"/>
 
 </android.support.design.widget.CoordinatorLayout>
 

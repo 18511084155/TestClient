@@ -18,6 +18,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.Editable;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Button;
@@ -43,6 +44,7 @@ import quant.testclient.utils.ResUtils;
 import quant.testclient.utils.StringUtils;
 
 public class MainActivity extends AppCompatActivity implements Handler.Callback{
+    private static final String TAG = "MainActivity";
     @Id(R.id.tv_id)
     private TextView localIp;
     @Id(R.id.et_server_address)
@@ -61,6 +63,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
     private NetStatusReceiver netWorkReceiver;
     private Messenger messenger;
     private Messenger reply;
+    private AlertDialog alertDialog;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -84,6 +87,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
 
         connectButton.setOnClickListener(v -> sendConnectMessage(serverEditor.getText()));
         connectState.setOnClickListener(v->sendMessage(What.Socket.DISCONNECT));
+        findViewById(R.id.iv_clear).setOnClickListener(v->logTextView.setText(null));
     }
 
     /**
@@ -201,10 +205,12 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
 
         //adb连接
         if(What.ADB.CONNECT_COMPLETE==msg.what){
-            //连接 adb 成功
+            //连接 adb 成功,若弹出警告框,则取消
             adbState.setText(R.string.connect_complete);
             statusView.setText(R.string.connect_complete);
             logTextView.append(getString(R.string.connect_adb_complete,msg.obj.toString()));
+            if(null!=alertDialog&&alertDialog.isShowing()) alertDialog.dismiss();
+            Log.e(TAG,"CONNECT_COMPLETE:"+msg.obj);
         } else if(What.ADB.CONNECT_FAILED==msg.what){
             //连接 adb 失败
             adbState.setText(R.string.connect_failed);
@@ -213,6 +219,8 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
             //adb 连接中断
             adbState.setText(R.string.connect_interrupt);
             statusView.setText(R.string.connect_interrupt);
+        } else if(What.ADB.ALERT_ADB_DEBUG==msg.what&&(null==alertDialog||!alertDialog.isShowing())){
+            alertDialog = new AlertDialog.Builder(this).setTitle(R.string.app_alert).setMessage(R.string.debug_message).setCancelable(false).show();
         }
         return true;
     }

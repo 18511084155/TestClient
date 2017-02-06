@@ -40,4 +40,6 @@
     <string name="set_connect_port_complete">设置 Adb无线调试端口成功!</string>
     <string name="set_connect_port_failed">设置无线调试端口失败,开始重试</string>
     <string name="connect_adb_complete">设备:%1$s连接Adb成功!\n</string>
+    <string name="app_alert">应用提示</string>
+    <string name="debug_message">连接调试手机满足以下条件\n1:手机root,并授权,则手机会自动连接无线调试\n2:手机连入usb并开启调试模式\n以上,操作后,此弹窗会自动消失</string>
 </resources>
