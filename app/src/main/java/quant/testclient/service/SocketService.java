@@ -236,6 +236,9 @@ public class SocketService extends Service implements ServiceCallback{
             } else if(What.ADB.LOG==protocol.what){
                 //adb 日志
                 sendMessage(What.Socket.LOG,protocol.message);
+            } else if(What.ADB.ADB_INTERRUPT==protocol.what){
+                //adb 意外中断
+                sendMessage(protocol.what,protocol.address);
             }
 
         }

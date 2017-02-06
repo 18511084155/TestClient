@@ -25,7 +25,8 @@ public class  What {
         public static final int CONNECT_FAILED=ID+6;//连接失败
         public static final int KILL_SERVER=ID+7;//杀死 adb 服务
         public static final int START_SERVER=ID+8;//启动 adb 服务
-        public static final int LOG=ID+9;
+        public static final int LOG=ID+9;// adb日志
+        public static final int ADB_INTERRUPT=ID+10;//adb意外中断
     }
 
 

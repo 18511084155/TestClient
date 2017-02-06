@@ -209,6 +209,10 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
             //连接 adb 失败
             adbState.setText(R.string.connect_failed);
             statusView.setText(R.string.connect_failed);
+        } else if(What.ADB.ADB_INTERRUPT==msg.what){
+            //adb 连接中断
+            adbState.setText(R.string.connect_interrupt);
+            statusView.setText(R.string.connect_interrupt);
         }
         return true;
     }

@@ -24,8 +24,8 @@ public class CheckAdbProcessor extends IProcessor {
 
     @Override
     public void process() {
-        sendMessage(What.Socket.LOG, ResUtils.getString(R.string.start_connect_adb_address,message));
-        if(!TextUtils.isEmpty(message)){
+        sendMessage(What.Socket.LOG, ResUtils.getString(R.string.start_connect_adb_address,address));
+        if(!TextUtils.isEmpty(address)){
             if(ShellService.isRoot()){
                 //己 root,设备连接端口
                  if(0<=ShellService.setConnectPort()){
