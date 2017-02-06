@@ -137,6 +137,8 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
                 //主动连接默认地址
                 String address=Prefs.getString(Setting.SERVER_IP);
                 if(!TextUtils.isEmpty(address)&& StringUtils.validateAddress(address)){
+                    serverEditor.setText(address);
+                    serverEditor.setSelection(address.length());
                     sendMessage(What.Socket.CONNECT,address);
                 }
             }

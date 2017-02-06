@@ -2,7 +2,6 @@ package quant.testclient.service;
 
 import android.app.Service;
 import android.content.Intent;
-import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
@@ -41,14 +40,16 @@ public class SocketService extends Service implements ServiceCallback{
     public static final String TAG="SocketService";
     private volatile Looper serviceLooper;
     private volatile ServiceHandler serviceHandler;
-    private PrintWriter printWriter;
-    private Messenger currentReply;
     private final Runnable examiner;
+    private Messenger currentReply;
     //socket 是否连接检测对象
     private Handler handler;
+    private boolean isLooper;
     private Socket socket;
+    private PrintWriter printWriter;
+    private BufferedReader reader;
     private int reconnectCount;
-    private boolean interrupt;
+
 
     private final class ServiceHandler extends Handler {
         public ServiceHandler(Looper looper) {
@@ -88,7 +89,9 @@ public class SocketService extends Service implements ServiceCallback{
                 //发送给 handleService连接 socket
                 if(null!=msg.obj&& StringUtils.validateAddress(msg.obj.toString())){
                     ensureSocket(msg.obj.toString());
-                    serviceHandler.sendMessage(Message.obtain(msg));
+                    if(!isLooper){
+                        serviceHandler.sendMessage(Message.obtain(msg));
+                    }
                 }
             } else if(What.ADB.CONNECT==msg.what){
                 //连接 adb
@@ -99,7 +102,7 @@ public class SocketService extends Service implements ServiceCallback{
             } else if(What.Socket.DISCONNECT==msg.what){
                 //中断socket 连接
                 if(socketIsConnect(socket)){
-                    interrupt =false;
+                    isLooper =false;
                     closeSocket();
                     sendMessage(What.Socket.DISCONNECT,!socketIsConnect(socket));
                 }
@@ -112,7 +115,7 @@ public class SocketService extends Service implements ServiceCallback{
     @Override
     public void onCreate() {
         super.onCreate();
-        HandlerThread thread = new HandlerThread("socketThread");
+        HandlerThread thread = new HandlerThread("serviceThread");
         thread.start();
 
         serviceLooper = thread.getLooper();
@@ -138,6 +141,8 @@ public class SocketService extends Service implements ServiceCallback{
                 //连接地址不同,重新连接
                 if (!address.equals(hostAddress)){
                     closeSocket();
+                } else if(isLooper){
+                    sendMessage(What.Socket.LOG,ResUtils.getString(R.string.current_connecting,address));
                 } else {
                     sendMessage(What.Socket.LOG,ResUtils.getString(R.string.already_connect,address));
                 }
@@ -153,27 +158,28 @@ public class SocketService extends Service implements ServiceCallback{
      * @param address
      */
     public void connectSocket(String address) throws RemoteException {
-        interrupt =true;
-        while (interrupt) {
+        isLooper =true;
+        while (isLooper) {
             Log.e(TAG, "connect:" + socketIsConnect(socket));
             if (socketIsConnect(socket)) {
                 String line;
-                BufferedReader  br =null;
                 try {
-                    br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                    while (null!=(line = br.readLine())) {
+                    closeReaderStream();
+                    reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    while (null!=reader&&null!=(line = reader.readLine())) {
+                        Log.e(TAG,"while:"+(null!=socket));
                         if(socketIsConnect(socket)){
                             //处理数据
                             processProtocol(Json.getObject(Protocol.class, line));
-                        } else if(interrupt){
+                        } else if(isLooper){
                             connectSocket(address);
                         }
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
-                    IOUtils.closeStream(br);
-                    if(interrupt) connectSocket(address);
+                    IOUtils.closeStream(reader);
+                    if(isLooper) connectSocket(address);
                 }
             } else {
                 if (null != socket) {
@@ -187,6 +193,7 @@ public class SocketService extends Service implements ServiceCallback{
                 }
                 //连接断开,重联
                 try {
+                    closeSocket();
                     socket = new Socket(address, Constant.PORT);
                     socket.setSoTimeout(0);
                     socket.setKeepAlive(true);
@@ -203,7 +210,7 @@ public class SocketService extends Service implements ServiceCallback{
                     handler.removeCallbacks(examiner);
 //                    handler.postDelayed(examiner, 1000);
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    closeSocket();
                     reconnectCount++;
                     sendMessage(What.Socket.CONNECT_FAILED);
                     sendMessage(What.Socket.CONNECT_STATUS,ResUtils.getString(R.string.connect_failed_value,address));
@@ -212,6 +219,7 @@ public class SocketService extends Service implements ServiceCallback{
             //延持
             SystemClock.sleep(3000);
         }
+        Log.e(TAG,"run finish!");
     }
 
     /**
@@ -254,15 +262,13 @@ public class SocketService extends Service implements ServiceCallback{
      * @return
      */
     public boolean socketIsConnect(Socket socket) {
-        boolean result = false;
+        boolean result = null != socket&&socket.isConnected();
         try {
             //发送1个字节的紧急数据，默认情况下，服务器端没有开启紧急数据处理，不影响正常通信
-            if (null != socket&&socket.isConnected()) {
+            if (result) {
                 socket.sendUrgentData(0);
-                result=true;
             }
         } catch (Exception se) {
-            se.printStackTrace();
             result = false;
         }
         return result;
@@ -275,15 +281,22 @@ public class SocketService extends Service implements ServiceCallback{
         try {
             if (null != socket && !socket.isClosed()) {
                 printWriter.close();
-                socket.shutdownInput();
-                socket.shutdownOutput();
                 socket.close();
                 socket = null;
             }
+            //此读取流为单独流对象,socket关闭后才可以关闭此流,socket关闭后,操作此流,会报错
+            closeReaderStream();
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
             handler.removeCallbacks(examiner);
+        }
+    }
+
+    private void closeReaderStream() throws IOException {
+        if(null!=reader){
+            reader.close();
+            reader=null;
         }
     }
 
