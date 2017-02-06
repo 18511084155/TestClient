@@ -48,5 +48,5 @@ dependencies {
     compile 'io.reactivex:rxandroid:0.24.0'
     compile 'com.cz.loglibrary:loglibrary:1.1.4'
     compile 'com.cz.library:injectlibrary:1.0.2'
-
+    compile 'com.google.code.gson:gson:2.2.4'
 }

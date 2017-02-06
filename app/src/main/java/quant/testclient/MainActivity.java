@@ -32,6 +32,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import quant.testclient.natives.NativeRuntime;
+import quant.testclient.model.What;
 import quant.testclient.receive.NetStatusReceiver;
 import quant.testclient.service.NotificationService;
 import quant.testclient.service.SocketService;
@@ -54,6 +55,8 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
     private TextView logTextView;
     @Id(R.id.btn_connect)
     private Button connectButton;
+    @Id(R.id.tv_status)
+    private TextView statusView;
     private ServiceConnection serviceConnection;
     private NetStatusReceiver netWorkReceiver;
     private Messenger messenger;
@@ -67,7 +70,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         setSupportActionBar(toolbar);
 
         //开启守护服务
-        initService(this);
+        initDaemonService();
 
         //初始化 socket service
         initSocketService();
@@ -80,8 +83,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         reply =new Messenger(new Handler(this));
 
         connectButton.setOnClickListener(v -> sendConnectMessage(serverEditor.getText()));
-        connectState.setOnClickListener(v->sendMessage(MessageWhat.DISCONNECT));
-        adbState.setOnClickListener(v->sendMessage(MessageWhat.DISCONNECT_ADB));
+        connectState.setOnClickListener(v->sendMessage(What.Socket.DISCONNECT));
     }
 
     /**
@@ -99,11 +101,14 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
             Prefs.putString(Setting.SERVER_IP, address.toString());
             serverEditor.setText(address);
             serverEditor.setSelection(address.length());
-            sendMessage(MessageWhat.CONNECT,address);
+            sendMessage(What.Socket.CONNECT,address);
         }
     }
 
-    public void initService(Context context) {
+    /**
+     * 增加守护进程
+     */
+    public void initDaemonService() {
         //守护进程服务
         String serviceName = ResUtils.getPackageName()+"."+ NotificationService.class.getSimpleName();
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -128,7 +133,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
                 //主动连接默认地址
                 String address=Prefs.getString(Setting.SERVER_IP);
                 if(!TextUtils.isEmpty(address)&& StringUtils.validateAddress(address)){
-                    sendMessage(MessageWhat.CONNECT,address);
+                    sendMessage(What.Socket.CONNECT,address);
                 }
             }
 
@@ -167,34 +172,43 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
      */
     @Override
     public boolean handleMessage(Message msg) {
-        //日志消息
-        switch (msg.what){
-            case MessageWhat.LOG:
-                if(null!=msg.obj) logTextView.append(msg.obj.toString()+"\n");
-                break;
-            case MessageWhat.CONNECT_COMPLETE:
-                connectState.setEnabled(true);
-                connectState.setText(R.string.connect_complete);
-                break;
-            case MessageWhat.CONNECT_FAILED:
-                connectState.setEnabled(false);
-                connectState.setText(R.string.connect_failed);
-                break;
-            case MessageWhat.DISCONNECT:
-                connectState.setText(R.string.connect_interrupt);
-                Boolean interrupt = null!=msg.obj&&Boolean.valueOf(msg.obj.toString());
-                connectState.setEnabled(!interrupt);
-                logTextView.append(ResUtils.getString(
-                        interrupt?R.string.disconnect_complete:R.string.disconnect_failed)+"\n");
-                break;
-            case MessageWhat.CONNECT_ADB_COMPLETE:
-                adbState.setEnabled(true);
-                adbState.setText(R.string.connect_complete);
-                break;
-            case MessageWhat.CONNECT_ADB_FAILED:
-                adbState.setEnabled(false);
-                adbState.setText(R.string.connect_failed);
-                break;
+        if(What.Socket.LOG==msg.what){
+            //日志消息
+            if(null!=msg.obj) logTextView.append(msg.obj.toString()+"\n");
+        } else if(What.Socket.CONNECT_COMPLETE==msg.what){
+            //连接正常
+            connectState.setEnabled(true);
+            connectState.setText(R.string.connect_complete);
+            statusView.setText(R.string.connect_complete);
+        } else if(What.Socket.CONNECT_FAILED==msg.what){
+            //连接失败
+            connectState.setEnabled(false);
+            connectState.setText(R.string.connect_failed);
+            statusView.setText(R.string.connect_failed);
+        } else if(What.Socket.DISCONNECT==msg.what){
+            //主动中断连接
+            connectState.setText(R.string.connect_interrupt);
+            Boolean interrupt = null!=msg.obj&&Boolean.valueOf(msg.obj.toString());
+            connectState.setEnabled(!interrupt);
+            logTextView.append(ResUtils.getString(
+                    interrupt?R.string.disconnect_complete:R.string.disconnect_failed)+"\n");
+            statusView.setText(ResUtils.getString(
+                    interrupt?R.string.disconnect_complete:R.string.disconnect_failed));
+        } else if(What.Socket.CONNECT_STATUS==msg.what){
+            //连接状态变化信息
+            if(null!=msg.obj) statusView.setText(msg.obj.toString());
+        }
+
+        //adb连接
+        if(What.ADB.CONNECT_COMPLETE==msg.what){
+            //连接 adb 成功
+            adbState.setText(R.string.connect_complete);
+            statusView.setText(R.string.connect_complete);
+            logTextView.append(getString(R.string.connect_adb_complete,msg.obj.toString()));
+        } else if(What.ADB.CONNECT_FAILED==msg.what){
+            //连接 adb 失败
+            adbState.setText(R.string.connect_failed);
+            statusView.setText(R.string.connect_failed);
         }
         return true;
     }
@@ -217,10 +231,6 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
             Message msg = Message.obtain(null, what,obj);
             //设置回调用的Messenger
             msg.replyTo = reply;
-            //为所有消息放入设备 id
-            Bundle data=new Bundle();
-            data.putString("id",DeviceUtils.getDeviceId(getApplicationContext()));
-            msg.setData(data);
             try {
                 messenger.send(msg);
             } catch (RemoteException e) {

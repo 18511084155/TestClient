@@ -2,7 +2,6 @@ package quant.testclient.service;
 
 import android.app.Service;
 import android.content.Intent;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
@@ -12,7 +11,6 @@ import android.os.Messenger;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.support.annotation.Nullable;
-import android.text.TextUtils;
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -22,8 +20,14 @@ import java.io.PrintWriter;
 import java.net.Socket;
 
 import quant.testclient.Constant;
-import quant.testclient.MessageWhat;
 import quant.testclient.R;
+import quant.testclient.callback.ServiceCallback;
+import quant.testclient.model.Json;
+import quant.testclient.model.Protocol;
+import quant.testclient.model.What;
+import quant.testclient.protocol.process.CheckAdbProcessor;
+import quant.testclient.protocol.process.ConnectAdbProcess;
+import quant.testclient.utils.DeviceUtils;
 import quant.testclient.utils.IOUtils;
 import quant.testclient.utils.ResUtils;
 import quant.testclient.utils.StringUtils;
@@ -32,7 +36,7 @@ import quant.testclient.utils.StringUtils;
 /**
  * Created by cz on 2017/2/3.
  */
-public class SocketService extends Service {
+public class SocketService extends Service implements ServiceCallback{
     public static final String TAG="SocketService";
     private volatile Looper serviceLooper;
     private volatile ServiceHandler serviceHandler;
@@ -51,14 +55,11 @@ public class SocketService extends Service {
         }
         @Override
         public void handleMessage(Message msg) {
-            if(MessageWhat.CONNECT==msg.what){
+            if(What.Socket.CONNECT==msg.what){
                 //连接 socket,连接完自动尝试连接 adb,一旦连接成功,此线程会被阻塞
                 if(null!=msg.obj&& StringUtils.validateAddress(msg.obj.toString())){
                     try {
-                        Bundle data = msg.getData();
-                        String id=null;
-                        if(null!=data) id=data.getString("id");
-                        connectSocket(msg.obj.toString(),id);
+                        connectSocket(msg.obj.toString());
                     } catch (RemoteException e) {
                         e.printStackTrace();
                     }
@@ -82,28 +83,25 @@ public class SocketService extends Service {
         handler=new Handler(msg -> {
             this.currentReply=msg.replyTo;
             //主线程发送到子线程执行
-            switch (msg.what){
-                case MessageWhat.CONNECT:
-                    //发送给 handleService连接 socket
-                    if(null!=msg.obj&& StringUtils.validateAddress(msg.obj.toString())){
-                        ensureSocket(msg.obj.toString());
-                        serviceHandler.sendMessage(Message.obtain(msg));
-                    }
-                    break;
-                case MessageWhat.CONNECT_ADB:
-                    //连接 adb
-                    break;
-                case MessageWhat.DISCONNECT:
-                    //中断socket 连接
-                    if(socketIsConnect(socket)){
-                        interrupt =false;
-                        closeSocket();
-                        sendMessage(MessageWhat.DISCONNECT,!socketIsConnect(socket));
-                    }
-                    break;
-                case MessageWhat.DISCONNECT_ADB:
-                    //中断 adb 连接
-                    break;
+            if(What.Socket.CONNECT==msg.what){
+                //发送给 handleService连接 socket
+                if(null!=msg.obj&& StringUtils.validateAddress(msg.obj.toString())){
+                    ensureSocket(msg.obj.toString());
+                    serviceHandler.sendMessage(Message.obtain(msg));
+                }
+            } else if(What.ADB.CONNECT==msg.what){
+                //连接 adb
+                if(null!=msg.obj&& StringUtils.validateAddress(msg.obj.toString())){
+                    ensureSocket(msg.obj.toString());
+                    sendSocketMessage(msg.what,msg.obj.toString(),msg.obj.toString());
+                }
+            } else if(What.Socket.DISCONNECT==msg.what){
+                //中断socket 连接
+                if(socketIsConnect(socket)){
+                    interrupt =false;
+                    closeSocket();
+                    sendMessage(What.Socket.DISCONNECT,!socketIsConnect(socket));
+                }
             }
             return true;
         });
@@ -140,7 +138,7 @@ public class SocketService extends Service {
                 if (!address.equals(hostAddress)){
                     closeSocket();
                 } else {
-                    sendMessage(MessageWhat.LOG,ResUtils.getString(R.string.already_connect,address));
+                    sendMessage(What.Socket.LOG,ResUtils.getString(R.string.already_connect,address));
                 }
             } else if (!socket.isClosed()) {
                 closeSocket();
@@ -152,63 +150,94 @@ public class SocketService extends Service {
      * 连接socket
      *
      * @param address
-     * @param id 设备 id
      */
-    public void connectSocket(String address,String id) throws RemoteException {
+    public void connectSocket(String address) throws RemoteException {
         interrupt =true;
-        BufferedReader br = null;
         while (interrupt) {
             Log.e(TAG, "connect:" + socketIsConnect(socket));
             if (socketIsConnect(socket)) {
                 String line;
+                BufferedReader  br =null;
                 try {
-                    if (null == br) {
-                        br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                    }
-                    while ((line = br.readLine()) != null) {
+                    br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    while (null!=(line = br.readLine())) {
                         if(socketIsConnect(socket)){
-                            if (TextUtils.isEmpty(line)) continue;
                             //处理数据
-                        } else {
-                            connectSocket(address,id);
+                            processProtocol(Json.getObject(Protocol.class, line));
+                        } else if(interrupt){
+                            connectSocket(address);
                         }
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
+                    IOUtils.closeStream(br);
+                    if(interrupt) connectSocket(address);
                 }
             } else {
                 if (null != socket) {
-                    sendMessage(MessageWhat.LOG, ResUtils.getString(R.string.reconnect_count_value,++reconnectCount));
+                    sendMessage(What.Socket.LOG, ResUtils.getString(R.string.reconnect_count_value,reconnectCount));
+                } else if(0<reconnectCount){
+                    //重联多次信息
+                    sendMessage(What.Socket.CONNECT_STATUS,ResUtils.getString(R.string.reconnect_count_value,reconnectCount));
                 } else {
-                    sendMessage(MessageWhat.LOG,ResUtils.getString(R.string.start_connect));
+                    //第一次开始联接
+                    sendMessage(What.Socket.LOG,ResUtils.getString(R.string.start_connect));
                 }
-                IOUtils.closeStream(br);
                 //连接断开,重联
                 try {
                     socket = new Socket(address, Constant.PORT);
                     socket.setKeepAlive(true);
                     printWriter = new PrintWriter(socket.getOutputStream());
-                    //向服务器写入设备
-                    printWriter.write(id);
-                    sendMessage(MessageWhat.LOG,ResUtils.getString(R.string.connecting));
+                    sendMessage(What.Socket.LOG,ResUtils.getString(R.string.connecting));
                     //重试后连接成功
                     if (0 < reconnectCount) {
-                        sendMessage(MessageWhat.LOG,"Adb connected!reconnect count:" + reconnectCount);
+                        sendMessage(What.Socket.LOG, ResUtils.getString(R.string.reconnect_complete_value,reconnectCount));
                         reconnectCount = 0;
                     }
-                    sendMessage(MessageWhat.CONNECT_COMPLETE);
-                    sendMessage(MessageWhat.LOG,ResUtils.getString(R.string.server_address_value,address));
+                    sendMessage(What.Socket.CONNECT_COMPLETE);
+                    sendMessage(What.Socket.LOG,ResUtils.getString(R.string.server_address_value,address));
 //                    //socket连接时,开启一个handler不断检测socket状态,此线程己被阻塞,因此可能存在假死
                     handler.removeCallbacks(examiner);
                     handler.postDelayed(examiner, 1000);
                 } catch (IOException e) {
                     e.printStackTrace();
-                    sendMessage(MessageWhat.CONNECT_FAILED);
-                    sendMessage(MessageWhat.LOG,ResUtils.getString(R.string.connect_failed_value,address));
+                    reconnectCount++;
+                    sendMessage(What.Socket.CONNECT_FAILED);
+                    sendMessage(What.Socket.CONNECT_STATUS,ResUtils.getString(R.string.connect_failed_value,address));
                 }
             }
             //延持
-            SystemClock.sleep(1000);
+            SystemClock.sleep(3000);
+        }
+    }
+
+    /**
+     * 处理协议(此处都为 adb 操作)
+     * @param protocol
+     */
+    private void processProtocol(Protocol protocol) {
+        String address = DeviceUtils.getAddress();
+        Log.e(TAG,"processProtocol:"+protocol);
+        if(null!=protocol&&protocol.address.equals(address)){
+            if(What.ADB.CHECK_ADB==protocol.what){
+                //检测adb 连接
+                new CheckAdbProcessor(this,protocol.address,protocol.message).process();
+            } else if(What.ADB.CONNECT==protocol.what){
+                new ConnectAdbProcess(this,protocol.message,protocol.message).process();
+            } else if(What.ADB.CONNECT_COMPLETE==protocol.what){
+                //设备连接成功
+                sendMessage(protocol.what,protocol.address);
+            } else if(What.ADB.CONNECT_FAILED==protocol.what){
+                //设备连接失败
+            } else if(What.ADB.KILL_SERVER==protocol.what){
+                //杀死 adb 服务
+            } else if(What.ADB.START_SERVER==protocol.what){
+                //启动 adb 服务
+            } else if(What.ADB.LOG==protocol.what){
+                //adb 日志
+                sendMessage(What.Socket.LOG,protocol.message);
+            }
+
         }
     }
 
@@ -264,14 +293,23 @@ public class SocketService extends Service {
      * @param what
      * @param obj
      */
+    @Override
     public void sendMessage(int what,Object obj) {
         if(null!=currentReply){
-            Message msg = Message.obtain(null, what,obj);
             try {
-                currentReply.send(msg);
+                currentReply.send(Message.obtain(null, what,obj));
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
+        }
+        Log.e(TAG,"result:"+(null!=currentReply)+" sendMessage:"+what+" msg:"+obj);
+    }
+
+    @Override
+    public void sendSocketMessage(int what,String address, String message) {
+        if (null!=printWriter) {
+            printWriter.println(Json.toJson(new Protocol(what,address,message)));
+            printWriter.flush();
         }
     }
 

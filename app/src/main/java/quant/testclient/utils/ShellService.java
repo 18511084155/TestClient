@@ -8,7 +8,7 @@ import java.io.IOException;
 /**
  * adb服务
  */
-public class AdbService {
+public class ShellService {
 
     /**
      * @param comment
@@ -85,10 +85,6 @@ public class AdbService {
             Process process = Runtime.getRuntime().exec("su");
             DataOutputStream outputStream = new DataOutputStream(process.getOutputStream());
             outputStream.writeBytes("setprop service.adb.tcp.port 5555 \n");
-            outputStream.flush();
-            outputStream.writeBytes("stop adbd\n");
-            outputStream.flush();
-            outputStream.writeBytes("start adbd\n");
             outputStream.flush();
             outputStream.writeBytes("exit\n");
             outputStream.flush();
