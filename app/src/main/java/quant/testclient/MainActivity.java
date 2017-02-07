@@ -178,6 +178,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
             if(wifiConnected()){
                 if(equalsAddressSegment(address,DeviceUtils.getAddress())){
                     Prefs.putString(Setting.SERVER_IP, address.toString());
+                    connectButton.setEnabled(false);
                     serverEditor.setText(address);
                     serverEditor.setSelection(address.length());
                     sendMessage(What.Socket.CONNECT,address);
@@ -277,6 +278,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         } else if(What.Socket.CONNECT_COMPLETE==msg.what){
             //连接正常
             connectState.setEnabled(true);
+            connectButton.setEnabled(true);
             connectState.setText(R.string.connect_complete);
             statusView.setText(R.string.connect_complete);
         } else if(What.Socket.CONNECT_FAILED==msg.what){
