@@ -1,11 +1,16 @@
 package quant.testclient;
 
+import android.app.Dialog;
+import android.app.ProgressDialog;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -32,8 +37,10 @@ import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import quant.testclient.natives.NativeRuntime;
+import quant.testclient.bus.RxBus;
+import quant.testclient.event.NetWorkChangedEvent;
 import quant.testclient.model.What;
+import quant.testclient.natives.NativeRuntime;
 import quant.testclient.receive.NetStatusReceiver;
 import quant.testclient.service.NotificationService;
 import quant.testclient.service.SocketService;
@@ -59,11 +66,13 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
     private Button connectButton;
     @Id(R.id.tv_status)
     private TextView statusView;
+    private AlertDialog alertDialog;
+    private AlertDialog wifiDialog;
+    private ProgressDialog progressDialog;
     private ServiceConnection serviceConnection;
     private NetStatusReceiver netWorkReceiver;
     private Messenger messenger;
     private Messenger reply;
-    private AlertDialog alertDialog;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -88,6 +97,18 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         connectButton.setOnClickListener(v -> sendConnectMessage(serverEditor.getText()));
         connectState.setOnClickListener(v->sendMessage(What.Socket.DISCONNECT));
         findViewById(R.id.iv_clear).setOnClickListener(v->logTextView.setText(null));
+
+        //订阅网络变化
+        RxBus.subscribe(NetWorkChangedEvent.class,event->{
+            if(ConnectivityManager.TYPE_WIFI==event.currentType){
+                //当前网络状态为 wifi
+                dismissDialog(wifiDialog,progressDialog);
+                connectSocketAndCheckWifi(Prefs.getString(Setting.SERVER_IP));
+            } else {
+                //网络切换为无网络,或者其他
+                alertWifiServiceDialog();
+            }
+        });
     }
 
     /**
@@ -102,10 +123,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         } else if(!matcher.matches()){
             Snackbar.make(findViewById(android.R.id.content),R.string.server_address_error,Snackbar.LENGTH_SHORT).show();
         } else {
-            Prefs.putString(Setting.SERVER_IP, address.toString());
-            serverEditor.setText(address);
-            serverEditor.setSelection(address.length());
-            sendMessage(What.Socket.CONNECT,address);
+            connectSocketAndCheckWifi(address.toString());
         }
     }
 
@@ -135,12 +153,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
                 JLog.e("onServiceConnected");
                 messenger=new Messenger(service);
                 //主动连接默认地址
-                String address=Prefs.getString(Setting.SERVER_IP);
-                if(!TextUtils.isEmpty(address)&& StringUtils.validateAddress(address)){
-                    serverEditor.setText(address);
-                    serverEditor.setSelection(address.length());
-                    sendMessage(What.Socket.CONNECT,address);
-                }
+                connectSocketAndCheckWifi(Prefs.getString(Setting.SERVER_IP));
             }
 
             @Override
@@ -153,6 +166,86 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
             new AlertDialog.Builder(this).setTitle(R.string.bind_service_failed).
                     setPositiveButton(R.string.ok,(dialog, which) -> dialog.dismiss()).show();
         }
+    }
+
+    /**
+     * 连接 socket,先检测 wifi 是否开启,再获取本地 ip 地址,检测是否在一个网段内
+     * @param address
+     */
+    private void connectSocketAndCheckWifi(String address) {
+        if(!TextUtils.isEmpty(address)&& StringUtils.validateAddress(address)){
+            //检测是否在同一个网段内
+            if(wifiConnected()){
+                if(equalsAddressSegment(address,DeviceUtils.getAddress())){
+                    Prefs.putString(Setting.SERVER_IP, address.toString());
+                    serverEditor.setText(address);
+                    serverEditor.setSelection(address.length());
+                    sendMessage(What.Socket.CONNECT,address);
+                } else {
+                    new AlertDialog.Builder(this).
+                            setCancelable(false).
+                            setTitle(R.string.app_alert).
+                            setMessage(R.string.wifi_service_not_same).setPositiveButton(R.string.reset_wifi,(dialog, which) -> {
+                                //前往设备重联
+                                if(android.os.Build.VERSION.SDK_INT > 10) {
+                                    startActivity(new Intent( android.provider.Settings.ACTION_SETTINGS));
+                                } else {
+                                    startActivity(new Intent( android.provider.Settings.ACTION_WIRELESS_SETTINGS));
+                                }
+                            }).show();
+                }
+            } else {
+                alertWifiServiceDialog();
+            }
+        }
+    }
+
+    /**
+     * 提示 wifi服务
+     */
+    private void alertWifiServiceDialog() {
+        dismissDialog(wifiDialog);
+        wifiDialog = new AlertDialog.Builder(this).
+                setCancelable(false).
+                setTitle(R.string.app_alert).
+                setMessage(R.string.open_wifi_service).
+                setPositiveButton(R.string.open_wifi, (dialog, which) -> {
+                    //重启 wifi 再重联
+                    progressDialog = new ProgressDialog(this);
+                    progressDialog.setMessage(getString(R.string.open_wifi_ing));
+                    progressDialog.setCancelable(false);
+                    progressDialog.show();
+                    DeviceUtils.resetWifi(getApplication());
+                }).show();
+    }
+
+    private void dismissDialog(Dialog... dialogs){
+        if(null!=dialogs){
+            for(Dialog dialog:dialogs){
+                if(null!=dialog&&dialog.isShowing()){
+                    dialog.dismiss();
+                }
+            }
+        }
+    }
+
+    /**
+     * 检测网络段是否一致
+     * @param address1
+     * @param address2
+     * @return
+     */
+    private boolean equalsAddressSegment(String address1, String address2) {
+        boolean result=false;
+        if(StringUtils.validateAddress(address1)&&StringUtils.validateAddress(address2)){
+            Pattern pattern = Pattern.compile("(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\.\\d{1,3}");
+            Matcher matcher1 = pattern.matcher(address1);
+            Matcher matcher2 = pattern.matcher(address2);
+            if(matcher1.find()&&matcher2.find()){
+                result=matcher1.group(1).equals(matcher2.group(1));
+            }
+        }
+        return result;
     }
 
     @Override
@@ -253,6 +346,32 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         }
     }
 
+    /**
+     * 检测 wifi 是否开启
+     * @return
+     */
+    private boolean wifiConnected() {
+        boolean result = false;
+        ConnectivityManager manager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if(Build.VERSION.SDK_INT<Build.VERSION_CODES.LOLLIPOP){
+            NetworkInfo networkInfo = manager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+            if (networkInfo != null) {
+                result = networkInfo.isConnected();
+            }
+        } else {
+            Network[] allNetworks = manager.getAllNetworks();
+            if(null!=allNetworks){
+                for(Network network:allNetworks){
+                    NetworkInfo networkInfo = manager.getNetworkInfo(network);
+                    if(null!=networkInfo&&ConnectivityManager.TYPE_WIFI==networkInfo.getType()){
+                        result=networkInfo.isConnected();
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
     @Override
     public void onBackPressed() {
         //按下返回键,跳转到桌面
@@ -263,6 +382,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
 
     @Override
     protected void onDestroy() {
+        RxBus.unSubscribeItems(this);
         if(null!=serviceConnection) unbindService(serviceConnection);
         if(null!=netWorkReceiver) unregisterReceiver(netWorkReceiver);
         super.onDestroy();

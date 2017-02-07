@@ -27,7 +27,11 @@ public class StringUtils {
      * @return
      */
     public static boolean validateAddress(String str) {
-        return matcher("(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})", str);
+        boolean result=false;
+        if(!TextUtils.isEmpty(str)){
+            result=matcher("(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})", str);
+        }
+        return result;
     }
 
     /**

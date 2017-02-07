@@ -43,4 +43,9 @@
     <string name="app_alert">应用提示</string>
     <string name="debug_message">连接调试手机满足以下条件\n1:手机root,并授权,则手机会自动连接无线调试\n2:手机连入usb并开启调试模式\n以上,操作后,此弹窗会自动消失</string>
     <string name="current_connecting">当前正在连接设备:%1$s</string>
+    <string name="open_wifi_service">此服务必须打开wifi!\n并与服务器连接到同一个网络段内!</string>
+    <string name="open_wifi">打开 Wifi</string>
+    <string name="wifi_service_not_same">连接 Wifi 网络不同,请切换</string>
+    <string name="reset_wifi">重置 wifi</string>
+    <string name="open_wifi_ing">正在打开 Wifi</string>
 </resources>
