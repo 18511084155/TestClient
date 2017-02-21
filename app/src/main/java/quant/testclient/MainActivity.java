@@ -17,6 +17,7 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
+import android.provider.Settings;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -46,6 +47,7 @@ import quant.testclient.service.NotificationService;
 import quant.testclient.service.SocketService;
 import quant.testclient.sharedprefs.Prefs;
 import quant.testclient.sharedprefs.Setting;
+import quant.testclient.utils.AccessibilityUtils;
 import quant.testclient.utils.DeviceUtils;
 import quant.testclient.utils.ResUtils;
 import quant.testclient.utils.StringUtils;
@@ -161,10 +163,12 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
                 JLog.e("onServiceDisconnected:" + name);
             }
         };
-        boolean bindResult = bindService(new Intent(this, SocketService.class), serviceConnection, Context.BIND_AUTO_CREATE);
-        if(!bindResult){
+        if(!bindService(new Intent(this, SocketService.class), serviceConnection, Context.BIND_AUTO_CREATE)){
             new AlertDialog.Builder(this).setTitle(R.string.bind_service_failed).
                     setPositiveButton(R.string.ok,(dialog, which) -> dialog.dismiss()).show();
+        } else if(!AccessibilityUtils.updateServiceStatus(this)){
+            new AlertDialog.Builder(this).setTitle(R.string.open_accessibility_service).
+                    setPositiveButton(R.string.ok,(dialog, which) -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))).show();
         }
     }
 
@@ -261,6 +265,10 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         if (id == R.id.action_settings) {
             startActivity(new Intent(getApplicationContext(), SettingActivity.class));
             return true;
+        } else if(id == R.id.accessibility_settings){
+            // 打开系统设置中辅助功能
+            Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+            startActivity(intent);
         }
         return super.onOptionsItemSelected(item);
     }

@@ -48,4 +48,7 @@
     <string name="wifi_service_not_same">连接 Wifi 网络不同,请切换</string>
     <string name="reset_wifi">重置 wifi</string>
     <string name="open_wifi_ing">正在打开 Wifi</string>
+    <string name="desc">打开后,会自动应对一些自动化测试需要的简单操作.如自动安装程序的提示</string>
+    <string name="open_accessibility_service">请打开系统辅助服务,否则导致部分功能障碍</string>
+    <string name="accessibility_settings">辅助服务</string>
 </resources>
