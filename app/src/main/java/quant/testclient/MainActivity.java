@@ -42,11 +42,12 @@ import quant.testclient.bus.RxBus;
 import quant.testclient.event.NetWorkChangedEvent;
 import quant.testclient.model.What;
 import quant.testclient.natives.NativeRuntime;
+import quant.testclient.file.FilePrefs;
 import quant.testclient.receive.NetStatusReceiver;
 import quant.testclient.service.NotificationService;
 import quant.testclient.service.SocketService;
-import quant.testclient.sharedprefs.Prefs;
-import quant.testclient.sharedprefs.Setting;
+import quant.testclient.prefs.Prefs;
+import quant.testclient.prefs.Setting;
 import quant.testclient.utils.AccessibilityUtils;
 import quant.testclient.utils.DeviceUtils;
 import quant.testclient.utils.ResUtils;
@@ -93,6 +94,9 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         intentFilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
         registerReceiver(netWorkReceiver = new NetStatusReceiver(), intentFilter);
 
+
+        String androidImei = DeviceUtils.getAndroidImei(getApplicationContext());
+
         localIp.setText(DeviceUtils.getAddress());
         reply =new Messenger(new Handler(this));
 
@@ -100,11 +104,13 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         connectState.setOnClickListener(v->sendMessage(What.Socket.DISCONNECT));
         findViewById(R.id.iv_clear).setOnClickListener(v->logTextView.setText(null));
 
+        FilePrefs.refreshPropFile(getApplicationContext());
         //订阅网络变化
         RxBus.subscribe(NetWorkChangedEvent.class,event->{
             if(ConnectivityManager.TYPE_WIFI==event.currentType){
                 //当前网络状态为 wifi
                 dismissDialog(wifiDialog,progressDialog);
+                FilePrefs.refreshPropFile(getApplicationContext());
                 connectSocketAndCheckWifi(Prefs.getString(Setting.SERVER_IP));
             } else {
                 //网络切换为无网络,或者其他
@@ -166,7 +172,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         if(!bindService(new Intent(this, SocketService.class), serviceConnection, Context.BIND_AUTO_CREATE)){
             new AlertDialog.Builder(this).setTitle(R.string.bind_service_failed).
                     setPositiveButton(R.string.ok,(dialog, which) -> dialog.dismiss()).show();
-        } else if(!AccessibilityUtils.updateServiceStatus(this)){
+        } else if(Build.VERSION.SDK_INT>Build.VERSION_CODES.KITKAT&&!AccessibilityUtils.updateServiceStatus(this)){
             new AlertDialog.Builder(this).setTitle(R.string.open_accessibility_service).
                     setPositiveButton(R.string.ok,(dialog, which) -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))).show();
         }
@@ -180,25 +186,25 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         if(!TextUtils.isEmpty(address)&& StringUtils.validateAddress(address)){
             //检测是否在同一个网段内
             if(wifiConnected()){
-                if(equalsAddressSegment(address,DeviceUtils.getAddress())){
+//                if(equalsAddressSegment(address,DeviceUtils.getAddress())){
                     Prefs.putString(Setting.SERVER_IP, address.toString());
                     connectButton.setEnabled(false);
                     serverEditor.setText(address);
                     serverEditor.setSelection(address.length());
                     sendMessage(What.Socket.CONNECT,address);
-                } else {
-                    new AlertDialog.Builder(this).
-                            setCancelable(false).
-                            setTitle(R.string.app_alert).
-                            setMessage(R.string.wifi_service_not_same).setPositiveButton(R.string.reset_wifi,(dialog, which) -> {
-                                //前往设备重联
-                                if(android.os.Build.VERSION.SDK_INT > 10) {
-                                    startActivity(new Intent( android.provider.Settings.ACTION_SETTINGS));
-                                } else {
-                                    startActivity(new Intent( android.provider.Settings.ACTION_WIRELESS_SETTINGS));
-                                }
-                            }).show();
-                }
+//                } else {
+//                    new AlertDialog.Builder(this).
+//                            setCancelable(false).
+//                            setTitle(R.string.app_alert).
+//                            setMessage(R.string.wifi_service_not_same).setPositiveButton(R.string.reset_wifi,(dialog, which) -> {
+//                                //前往设备重联
+//                                if(android.os.Build.VERSION.SDK_INT > 10) {
+//                                    startActivity(new Intent( android.provider.Settings.ACTION_SETTINGS));
+//                                } else {
+//                                    startActivity(new Intent( android.provider.Settings.ACTION_WIRELESS_SETTINGS));
+//                                }
+//                            }).show();
+//                }
             } else {
                 alertWifiServiceDialog();
             }

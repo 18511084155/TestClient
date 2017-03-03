@@ -1,4 +1,4 @@
-package quant.testclient.sharedprefs;
+package quant.testclient.prefs;
 
 /**
  * Created by cz on 4/3/16.

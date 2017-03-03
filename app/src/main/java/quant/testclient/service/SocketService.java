@@ -22,6 +22,8 @@ import java.net.Socket;
 import quant.testclient.Constant;
 import quant.testclient.R;
 import quant.testclient.callback.ServiceCallback;
+import quant.testclient.file.FileObserver;
+import quant.testclient.file.FilePrefs;
 import quant.testclient.model.Json;
 import quant.testclient.model.Protocol;
 import quant.testclient.model.What;
@@ -48,6 +50,7 @@ public class SocketService extends Service implements ServiceCallback{
     private Socket socket;
     private PrintWriter printWriter;
     private BufferedReader reader;
+    private FileObserver fileObserver;
     private int reconnectCount;
 
 
@@ -120,6 +123,8 @@ public class SocketService extends Service implements ServiceCallback{
 
         serviceLooper = thread.getLooper();
         serviceHandler = new ServiceHandler(serviceLooper);
+        fileObserver=new FileObserver(getApplication(),FilePrefs.PROP_FOLDER.getAbsolutePath());
+        fileObserver.startWatching();
     }
 
 
@@ -198,6 +203,7 @@ public class SocketService extends Service implements ServiceCallback{
                     socket.setSoTimeout(0);
                     socket.setKeepAlive(true);
                     printWriter = new PrintWriter(socket.getOutputStream());
+
                     sendMessage(What.Socket.CONNECT_COMPLETE);
                     sendMessage(What.Socket.LOG,ResUtils.getString(R.string.connecting));
                     sendMessage(What.Socket.LOG,ResUtils.getString(R.string.server_address_value,address));
@@ -337,6 +343,7 @@ public class SocketService extends Service implements ServiceCallback{
     @Override
     public void onDestroy() {
         serviceLooper.quit();
+        if(null!=fileObserver) fileObserver.stopWatching();
         startService(new Intent(this,getClass()));
     }
 }

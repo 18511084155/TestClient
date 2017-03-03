@@ -1,4 +1,4 @@
-package quant.testclient.sharedprefs;
+package quant.testclient.prefs;
 
 import android.annotation.TargetApi;
 import android.content.Context;

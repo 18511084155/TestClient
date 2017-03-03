@@ -20,8 +20,8 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.UUID;
 
-import quant.testclient.sharedprefs.Prefs;
-import quant.testclient.sharedprefs.Setting;
+import quant.testclient.prefs.Prefs;
+import quant.testclient.prefs.Setting;
 
 /**
  * 获得设备唯一id
