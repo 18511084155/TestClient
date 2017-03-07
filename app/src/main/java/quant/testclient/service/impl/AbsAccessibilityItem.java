@@ -8,21 +8,20 @@ import android.text.TextUtils;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
-import com.cz.loglibrary.JLog;
-
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 import quant.testclient.callback.Condition;
+import quant.testclient.service.AccessibilityCallback;
 import rx.functions.Action1;
 
 /**
  * Created by cz on 16/1/12.
  * 抽象的事件处理
  */
-public abstract class AbsAccessibilityItem {
+public abstract class AbsAccessibilityItem implements AccessibilityCallback {
     static final int TIME_OUT=2*1000;
     static final String EDIT_CLASS = "android.widget.EditText";
     static final String LIST_VIEW = "android.widget.AbsListView";
@@ -32,7 +31,7 @@ public abstract class AbsAccessibilityItem {
     static final String BUTTON = "android.widget.Button";
     protected static final Handler handler;
     private AccessibilityNodeInfo rootNode;
-    private Runnable findAction;
+    protected Runnable findAction;
     private Runnable backAction;
     private int scanTime;//检测时间
 
@@ -141,7 +140,7 @@ public abstract class AbsAccessibilityItem {
         return findNodes;
     }
 
-    protected void findNodes(String text, Action1<AccessibilityNodeInfo> action){
+    public void findNodes(String text, Action1<AccessibilityNodeInfo> action){
         findNodes(new String[]{text},null,action);
     }
 
@@ -150,7 +149,7 @@ public abstract class AbsAccessibilityItem {
      *
      * @param textArray
      */
-    protected void findNodes(String[] textArray, Condition<AccessibilityNodeInfo> condition, Action1<AccessibilityNodeInfo> action) {
+    public void findNodes(String[] textArray, Condition<AccessibilityNodeInfo> condition, Action1<AccessibilityNodeInfo> action) {
         removeAction();
         findAction = () -> {
             AccessibilityNodeInfo rootNode = getRootInActiveWindow();
@@ -158,11 +157,11 @@ public abstract class AbsAccessibilityItem {
                 List<AccessibilityNodeInfo> findNodes =null;
                 for(String text:textArray){
                     findNodes = rootNode.findAccessibilityNodeInfosByText(text);
-                    JLog.e("findNode:"+text+findNodes);
                     if (!findNodes.isEmpty()) {
                         for(Iterator<AccessibilityNodeInfo> iterator = findNodes.iterator(); iterator.hasNext();){
                             AccessibilityNodeInfo node = iterator.next();
-                            if(null!=condition&&condition.condition(node)){
+                            CharSequence nodeText = node.getText();
+                            if(null!=condition&&condition.condition(node)||!text.equals(nodeText.toString())){
                                 iterator.remove();
                             }
                         }
@@ -171,13 +170,12 @@ public abstract class AbsAccessibilityItem {
                         }
                     }
                 }
-                JLog.e("findResult:"+findNodes);
                 if(null!=findNodes&&!findNodes.isEmpty()){
                     removeAction();
                     if(null!=action){
                         action.call(findNodes.get(0));
                     }
-                } else if(scanTime<TIME_OUT){
+                } else if(scanTime<getTimeOut()){
                     //以每100毫秒重新检测
                     scanTime+=100;
                     handler.postDelayed(findAction, 100);
@@ -189,6 +187,7 @@ public abstract class AbsAccessibilityItem {
         handler.post(findAction);
     }
 
+
     /**
      * 移除事件
      */
@@ -197,6 +196,9 @@ public abstract class AbsAccessibilityItem {
         handler.removeCallbacks(findAction);
     }
 
+    protected int getTimeOut() {
+        return TIME_OUT;
+    }
 
     /**
      * 返回
