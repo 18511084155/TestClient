@@ -16,6 +16,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.PowerManager;
 import android.os.RemoteException;
 import android.provider.Settings;
 import android.support.design.widget.Snackbar;
@@ -27,6 +28,8 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -40,14 +43,14 @@ import java.util.regex.Pattern;
 
 import quant.testclient.bus.RxBus;
 import quant.testclient.event.NetWorkChangedEvent;
+import quant.testclient.file.FilePrefs;
 import quant.testclient.model.What;
 import quant.testclient.natives.NativeRuntime;
-import quant.testclient.file.FilePrefs;
+import quant.testclient.prefs.Prefs;
+import quant.testclient.prefs.Setting;
 import quant.testclient.receive.NetStatusReceiver;
 import quant.testclient.service.NotificationService;
 import quant.testclient.service.SocketService;
-import quant.testclient.prefs.Prefs;
-import quant.testclient.prefs.Setting;
 import quant.testclient.utils.AccessibilityUtils;
 import quant.testclient.utils.DeviceUtils;
 import quant.testclient.utils.ResUtils;
@@ -76,8 +79,13 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
     private NetStatusReceiver netWorkReceiver;
     private Messenger messenger;
     private Messenger reply;
+
+    private PowerManager powerManager;
+    private PowerManager.WakeLock wakeLock;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Window window = getWindow();
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON|WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Toolbar toolbar= (Toolbar) findViewById(R.id.toolbar);
@@ -148,6 +156,22 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
             String retx = "false";
             NativeRuntime.getInstance().RunExecutable(getPackageName(), executable, aliasfile, getPackageName() + "/" + serviceName);
         });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        powerManager = ((PowerManager) getSystemService(POWER_SERVICE));
+        wakeLock = powerManager.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ON_AFTER_RELEASE, TAG);
+        wakeLock.acquire();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if(null != wakeLock){
+            wakeLock.release();
+        }
     }
 
     /**

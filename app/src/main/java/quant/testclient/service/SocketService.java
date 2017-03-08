@@ -2,6 +2,7 @@ package quant.testclient.service;
 
 import android.app.Service;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
@@ -29,6 +30,7 @@ import quant.testclient.model.Protocol;
 import quant.testclient.model.What;
 import quant.testclient.protocol.process.CheckAdbProcessor;
 import quant.testclient.protocol.process.ConnectAdbProcess;
+import quant.testclient.receive.ScreenStatusReceiver;
 import quant.testclient.utils.DeviceUtils;
 import quant.testclient.utils.IOUtils;
 import quant.testclient.utils.ResUtils;
@@ -51,6 +53,7 @@ public class SocketService extends Service implements ServiceCallback{
     private PrintWriter printWriter;
     private BufferedReader reader;
     private FileObserver fileObserver;
+    private ScreenStatusReceiver screenStatusReceiver;
     private int reconnectCount;
 
 
@@ -125,6 +128,20 @@ public class SocketService extends Service implements ServiceCallback{
         serviceHandler = new ServiceHandler(serviceLooper);
         fileObserver=new FileObserver(getApplication(),FilePrefs.PROP_FOLDER.getAbsolutePath());
         fileObserver.startWatching();
+
+        //注册开屏广播
+        registerScreenStatusReceiver();
+    }
+
+    /**
+     * 注册开屏广播,作用为,当手机屏锁后,通过shell亮屏,然后再通过程序解锁
+     */
+    private void registerScreenStatusReceiver() {
+        screenStatusReceiver = new ScreenStatusReceiver();
+        IntentFilter screenStatusIF = new IntentFilter();
+        screenStatusIF.addAction(Intent.ACTION_SCREEN_ON);
+        screenStatusIF.addAction(Intent.ACTION_SCREEN_OFF);
+        registerReceiver(screenStatusReceiver, screenStatusIF);
     }
 
 
@@ -344,6 +361,7 @@ public class SocketService extends Service implements ServiceCallback{
     public void onDestroy() {
         serviceLooper.quit();
         if(null!=fileObserver) fileObserver.stopWatching();
+        if(null!=screenStatusReceiver) unregisterReceiver(screenStatusReceiver);
         startService(new Intent(this,getClass()));
     }
 }
