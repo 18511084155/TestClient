@@ -51,7 +51,6 @@ import quant.testclient.prefs.Setting;
 import quant.testclient.receive.NetStatusReceiver;
 import quant.testclient.service.NotificationService;
 import quant.testclient.service.SocketService;
-import quant.testclient.utils.AccessibilityUtils;
 import quant.testclient.utils.DeviceUtils;
 import quant.testclient.utils.ResUtils;
 import quant.testclient.utils.StringUtils;
@@ -196,10 +195,10 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         if(!bindService(new Intent(this, SocketService.class), serviceConnection, Context.BIND_AUTO_CREATE)){
             new AlertDialog.Builder(this).setTitle(R.string.bind_service_failed).
                     setPositiveButton(R.string.ok,(dialog, which) -> dialog.dismiss()).show();
-        } else if(Build.VERSION.SDK_INT>Build.VERSION_CODES.KITKAT&&!AccessibilityUtils.updateServiceStatus(this)){
+        } /*else if(Build.VERSION.SDK_INT>Build.VERSION_CODES.KITKAT&&!AccessibilityUtils.updateServiceStatus(this)){
             new AlertDialog.Builder(this).setTitle(R.string.open_accessibility_service).
                     setPositiveButton(R.string.ok,(dialog, which) -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))).show();
-        }
+        }*/
     }
 
     /**
