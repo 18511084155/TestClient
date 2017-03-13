@@ -102,8 +102,6 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         registerReceiver(netWorkReceiver = new NetStatusReceiver(), intentFilter);
 
 
-        String androidImei = DeviceUtils.getAndroidImei(getApplicationContext());
-
         localIp.setText(DeviceUtils.getAddress());
         reply =new Messenger(new Handler(this));
 
@@ -163,6 +161,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         powerManager = ((PowerManager) getSystemService(POWER_SERVICE));
         wakeLock = powerManager.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ON_AFTER_RELEASE, TAG);
         wakeLock.acquire();
+        initSocketService();
     }
 
     @Override
@@ -178,27 +177,26 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
      */
     private void initSocketService() {
         startService(new Intent(this, SocketService.class));
-        serviceConnection=new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName name, IBinder service) {
-                JLog.e("onServiceConnected");
-                messenger=new Messenger(service);
-                //主动连接默认地址
-                connectSocketAndCheckWifi(Prefs.getString(Setting.SERVER_IP));
-            }
+        if(null==serviceConnection){
+            serviceConnection=new ServiceConnection() {
+                @Override
+                public void onServiceConnected(ComponentName name, IBinder service) {
+                    JLog.e("onServiceConnected");
+                    messenger=new Messenger(service);
+                    //主动连接默认地址
+                    connectSocketAndCheckWifi(Prefs.getString(Setting.SERVER_IP));
+                }
 
-            @Override
-            public void onServiceDisconnected(ComponentName name) {
-                JLog.e("onServiceDisconnected:" + name);
+                @Override
+                public void onServiceDisconnected(ComponentName name) {
+                    JLog.e("onServiceDisconnected:" + name);
+                }
+            };
+            if(!bindService(new Intent(this, SocketService.class), serviceConnection, Context.BIND_AUTO_CREATE)){
+                new AlertDialog.Builder(this).setTitle(R.string.bind_service_failed).
+                        setPositiveButton(R.string.ok,(dialog, which) -> dialog.dismiss()).show();
             }
-        };
-        if(!bindService(new Intent(this, SocketService.class), serviceConnection, Context.BIND_AUTO_CREATE)){
-            new AlertDialog.Builder(this).setTitle(R.string.bind_service_failed).
-                    setPositiveButton(R.string.ok,(dialog, which) -> dialog.dismiss()).show();
-        } /*else if(Build.VERSION.SDK_INT>Build.VERSION_CODES.KITKAT&&!AccessibilityUtils.updateServiceStatus(this)){
-            new AlertDialog.Builder(this).setTitle(R.string.open_accessibility_service).
-                    setPositiveButton(R.string.ok,(dialog, which) -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))).show();
-        }*/
+        }
     }
 
     /**
@@ -422,7 +420,10 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
     @Override
     protected void onDestroy() {
         RxBus.unSubscribeItems(this);
-        if(null!=serviceConnection) unbindService(serviceConnection);
+        if(null!=serviceConnection) {
+            unbindService(serviceConnection);
+            serviceConnection=null;
+        }
         if(null!=netWorkReceiver) unregisterReceiver(netWorkReceiver);
         super.onDestroy();
         Intent intent = new Intent(this, getClass());

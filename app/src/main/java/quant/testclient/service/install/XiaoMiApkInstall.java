@@ -23,7 +23,7 @@ public class XiaoMiApkInstall extends AbsInstall{
         if(!installing&&!TextUtils.isEmpty(packageName)&& APP_INSTALL_PACKAGE.equals(packageName.toString())){
             //这里记录一个事件,一直检测并执行下去
             installing=true;
-            callback.findNodes(new String[]{"继续安装","安装"},it->!it.isClickable(),node->{
+            callback.findNodes(new String[]{"继续安装","允许"},it->!it.isClickable(),node->{
                 installing=false;
                 node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
             });
