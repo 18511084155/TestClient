@@ -78,9 +78,9 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
     private NetStatusReceiver netWorkReceiver;
     private Messenger messenger;
     private Messenger reply;
-
     private PowerManager powerManager;
     private PowerManager.WakeLock wakeLock;
+    private boolean selfDestory;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Window window = getWindow();
@@ -122,6 +122,7 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
                 alertWifiServiceDialog();
             }
         });
+
     }
 
     /**
@@ -161,7 +162,6 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         powerManager = ((PowerManager) getSystemService(POWER_SERVICE));
         wakeLock = powerManager.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ON_AFTER_RELEASE, TAG);
         wakeLock.acquire();
-        initSocketService();
     }
 
     @Override
@@ -177,25 +177,23 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
      */
     private void initSocketService() {
         startService(new Intent(this, SocketService.class));
-        if(null==serviceConnection){
-            serviceConnection=new ServiceConnection() {
-                @Override
-                public void onServiceConnected(ComponentName name, IBinder service) {
-                    JLog.e("onServiceConnected");
-                    messenger=new Messenger(service);
-                    //主动连接默认地址
-                    connectSocketAndCheckWifi(Prefs.getString(Setting.SERVER_IP));
-                }
-
-                @Override
-                public void onServiceDisconnected(ComponentName name) {
-                    JLog.e("onServiceDisconnected:" + name);
-                }
-            };
-            if(!bindService(new Intent(this, SocketService.class), serviceConnection, Context.BIND_AUTO_CREATE)){
-                new AlertDialog.Builder(this).setTitle(R.string.bind_service_failed).
-                        setPositiveButton(R.string.ok,(dialog, which) -> dialog.dismiss()).show();
+        serviceConnection=new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName name, IBinder service) {
+                JLog.e("onServiceConnected");
+                messenger=new Messenger(service);
+                //主动连接默认地址
+                connectSocketAndCheckWifi(Prefs.getString(Setting.SERVER_IP));
             }
+
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+                JLog.e("onServiceDisconnected:" + name);
+            }
+        };
+        if(!bindService(new Intent(this, SocketService.class), serviceConnection, Context.BIND_AUTO_CREATE)){
+            new AlertDialog.Builder(this).setTitle(R.string.bind_service_failed).
+                    setPositiveButton(R.string.ok,(dialog, which) -> dialog.dismiss()).show();
         }
     }
 
@@ -352,7 +350,14 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
             adbState.setText(R.string.connect_interrupt);
             statusView.setText(R.string.connect_interrupt);
         } else if(What.ADB.ALERT_ADB_DEBUG==msg.what&&(null==alertDialog||!alertDialog.isShowing())){
-            alertDialog = new AlertDialog.Builder(this).setTitle(R.string.app_alert).setMessage(R.string.debug_message).setCancelable(false).show();
+            alertDialog = new AlertDialog.Builder(this).
+                    setTitle(R.string.app_alert).
+                    setMessage(R.string.debug_message).
+                    setCancelable(false).
+                    setPositiveButton(R.string.exit,(dialog, which) -> {
+                        selfDestory=true;
+                        finish();
+                    }).show();
         }
         return true;
     }
@@ -426,9 +431,12 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
         }
         if(null!=netWorkReceiver) unregisterReceiver(netWorkReceiver);
         super.onDestroy();
-        Intent intent = new Intent(this, getClass());
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(intent);
+
+        if(!selfDestory){
+            Intent intent = new Intent(this, getClass());
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        }
     }
 
 

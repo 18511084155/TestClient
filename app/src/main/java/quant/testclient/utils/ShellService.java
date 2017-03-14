@@ -45,6 +45,7 @@ public class ShellService {
         return i == 0;
     }
 
+
     /**
      * 取消调试
      *
@@ -85,6 +86,10 @@ public class ShellService {
             Process process = Runtime.getRuntime().exec("su");
             DataOutputStream outputStream = new DataOutputStream(process.getOutputStream());
             outputStream.writeBytes("setprop service.adb.tcp.port 5555 \n");
+            outputStream.flush();
+            outputStream.writeBytes("stop adbd\n");
+            outputStream.flush();
+            outputStream.writeBytes("start adbd\n");
             outputStream.flush();
             outputStream.writeBytes("exit\n");
             outputStream.flush();

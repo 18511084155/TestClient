@@ -51,5 +51,6 @@
     <string name="desc">打开后,会自动应对一些自动化测试需要的简单操作.如自动安装程序的提示</string>
     <string name="open_accessibility_service">请打开系统辅助服务,否则导致部分功能障碍</string>
     <string name="accessibility_settings">辅助服务</string>
+    <string name="exit">退出</string>
 
 </resources>

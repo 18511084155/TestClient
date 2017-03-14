@@ -35,7 +35,7 @@ public class CheckAdbProcessor extends IProcessor {
                  } else {
                      //设置失败
                      sendMessage(What.Socket.LOG, ResUtils.getString(R.string.set_connect_port_failed,message));
-                     sendMessage(What.ADB.CONNECT,message);
+                     sendSocketMessage(What.ADB.CHECK_ADB,address,message);
                  }
             } else {
                 //未 root,弹出提示窗

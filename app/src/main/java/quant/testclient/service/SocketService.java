@@ -29,7 +29,6 @@ import quant.testclient.model.Json;
 import quant.testclient.model.Protocol;
 import quant.testclient.model.What;
 import quant.testclient.protocol.process.CheckAdbProcessor;
-import quant.testclient.protocol.process.ConnectAdbProcess;
 import quant.testclient.receive.ScreenStatusReceiver;
 import quant.testclient.utils.DeviceUtils;
 import quant.testclient.utils.IOUtils;
@@ -257,7 +256,7 @@ public class SocketService extends Service implements ServiceCallback{
                 //检测adb 连接
                 new CheckAdbProcessor(this,protocol.address,protocol.message).process();
             } else if(What.ADB.CONNECT==protocol.what){
-                new ConnectAdbProcess(this,protocol.message,protocol.message).process();
+
             } else if(What.ADB.CONNECT_COMPLETE==protocol.what){
                 //设备连接成功
                 sendMessage(protocol.what,protocol.address);
@@ -272,6 +271,9 @@ public class SocketService extends Service implements ServiceCallback{
                 sendMessage(What.Socket.LOG,protocol.message);
             } else if(What.ADB.ADB_INTERRUPT==protocol.what){
                 //adb 意外中断
+                sendMessage(protocol.what,protocol.address);
+            } else if(What.ADB.ALERT_ADB_DEBUG==protocol.what){
+                //手机未连接adb弹窗
                 sendMessage(protocol.what,protocol.address);
             }
 
