@@ -28,6 +28,7 @@ public class  What {
         public static final int LOG=ID+9;// adb日志
         public static final int ADB_INTERRUPT=ID+10;//adb意外中断
         public static final int ALERT_ADB_DEBUG=ID+11;//连上socket,但未root,未连接usb
+        public final static int TYPE_USER_RESTRICTED=ID+12;
     }
 
 

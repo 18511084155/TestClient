@@ -275,6 +275,8 @@ public class SocketService extends Service implements ServiceCallback{
             } else if(What.ADB.ALERT_ADB_DEBUG==protocol.what){
                 //手机未连接adb弹窗
                 sendMessage(protocol.what,protocol.address);
+            } else if(What.ADB.TYPE_USER_RESTRICTED==protocol.what){
+                sendMessage(protocol.what,protocol.address);
             }
 
         }

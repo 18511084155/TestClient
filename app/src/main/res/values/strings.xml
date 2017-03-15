@@ -42,6 +42,7 @@
     <string name="connect_adb_complete">设备:%1$s连接Adb成功!\n</string>
     <string name="app_alert">应用提示</string>
     <string name="debug_message">连接调试手机满足以下条件\n1:手机root,并授权,则手机会自动连接无线调试\n2:手机连入usb并开启调试模式\n以上,操作后,此弹窗会自动消失</string>
+    <string name="user_restricted">用户主动拒绝了软件安装,如果非手动拒绝,请检测手机安全中心,是否设置了拒绝安装此应用设置,若己解决,重新连接adb,可再次尝试</string>
     <string name="current_connecting">当前正在连接设备:%1$s</string>
     <string name="open_wifi_service">此服务必须打开wifi!\n并与服务器连接到同一个网络段内!</string>
     <string name="open_wifi">打开 Wifi</string>

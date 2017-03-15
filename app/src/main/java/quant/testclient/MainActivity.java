@@ -358,6 +358,13 @@ public class MainActivity extends AppCompatActivity implements Handler.Callback{
                         selfDestory=true;
                         finish();
                     }).show();
+        } else if(What.ADB.TYPE_USER_RESTRICTED==msg.what){
+            //用户拒绝安装提示
+            new AlertDialog.Builder(this).
+                    setTitle(R.string.app_alert).
+                    setMessage(R.string.user_restricted).
+                    setCancelable(false).
+                    setPositiveButton(android.R.string.ok,(dialog, which) -> dialog.dismiss()).show();
         }
         return true;
     }
